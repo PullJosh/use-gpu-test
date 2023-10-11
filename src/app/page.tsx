@@ -1,38 +1,21 @@
-"use client";
-
-import * as React from "react";
-
-import { makeCanvasApp } from "../../lib/makeCanvasApp";
-const TestApp = makeCanvasApp(import("./TestApp").then((m) => m.TestApp));
-
-import dynamic from "next/dynamic";
-const MathQuillInput = dynamic(
-  () =>
-    import("../components/MathQuillInput").then((mod) => mod.MathQuillInput),
-  { ssr: false }
-);
+import Link from "next/link";
 
 export default function Index() {
-  const [latex, setLatex] = React.useState("-x-y");
-
   return (
-    <div style={{ position: "relative" }}>
-      <TestApp latex={latex} width={640} height={480} />
-
-      <MathQuillInput
-        style={{
-          position: "absolute",
-          bottom: 10,
-          left: 10,
-          background: "#fff",
-          padding: "5px 10px",
-          border: "none",
-        }}
-        latex={latex}
-        onChange={(mathField) => {
-          setLatex(mathField.latex());
-        }}
-      />
+    <div>
+      <h1>Use.GPU Graphing Calculator Experiments</h1>
+      <ul>
+        <li>
+          <Link href="/function-3d">
+            3D Function Plotter (Cartesian & Polar)
+          </Link>
+        </li>
+        <li>
+          <Link href="/implicit-3d">
+            3D Implicit Equation Plotter (Cartesian & Polar)
+          </Link>
+        </li>
+      </ul>
     </div>
   );
 }

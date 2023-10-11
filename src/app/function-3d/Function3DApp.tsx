@@ -1,4 +1,11 @@
-import React, { LiveElement, useOne, useMemo, Provide } from "@use-gpu/live";
+import React, {
+  LiveElement,
+  useOne,
+  useMemo,
+  Provide,
+  useState,
+  useResource,
+} from "@use-gpu/live";
 import {
   Axis,
   Cartesian,
@@ -6,8 +13,10 @@ import {
   Grid,
   Line,
   Plot,
+  Polar,
   Surface,
   Transpose,
+  useRangeContext,
 } from "@use-gpu/plot";
 import { wgsl } from "@use-gpu/shader/wgsl";
 import type { ShaderModule } from "@use-gpu/shader";
@@ -34,16 +43,21 @@ import { vec3 } from "gl-matrix";
 import { getLineSegment } from "@use-gpu/wgsl/geometry/segment.wgsl";
 import { sizeToModulus2, unpackIndex2 } from "@use-gpu/wgsl/use/array.wgsl";
 
-import { mathToWGSL } from "../../lib/mathToWGSL";
+import { mathToWGSL } from "../../../lib/mathToWGSL";
 import { ComputeEngine } from "@cortex-js/compute-engine";
 const ce = new ComputeEngine();
 
-interface TestAppProps {
+interface Function3DAppProps {
   canvas: HTMLCanvasElement;
   latex: string;
+  graphType: "cartesian" | "polar";
 }
 
-export function TestApp({ latex, canvas }: TestAppProps): LiveElement {
+export function Function3DApp({
+  latex,
+  canvas,
+  graphType,
+}: Function3DAppProps): LiveElement {
   const mathJSON = useMemo(() => {
     try {
       return ce.parse(latex);
@@ -72,15 +86,17 @@ export function TestApp({ latex, canvas }: TestAppProps): LiveElement {
       `;
   }, [mathJSON]);
 
+  const bend = useSpring(graphType === "polar" ? 1 : 0);
+
   return (
     <WebGPU fallback={undefined}>
-      <Canvas canvas={canvas} samples={4}>
-        <PickingTarget>
-          <DOMEvents element={canvas}>
-            <CursorProvider element={canvas}>
-              <LinearRGB width={640} height={480}>
-                <Cursor cursor="move" />
-                <Loop>
+      <Loop>
+        <Canvas canvas={canvas} samples={4}>
+          <PickingTarget>
+            <DOMEvents element={canvas}>
+              <CursorProvider element={canvas}>
+                <LinearRGB width={640} height={480}>
+                  <Cursor cursor="move" />
                   <OrbitControls
                     radius={5}
                     bearing={-0.5}
@@ -103,25 +119,29 @@ export function TestApp({ latex, canvas }: TestAppProps): LiveElement {
                           {/* <AxisHelper size={1} width={3} /> */}
 
                           <Plot>
-                            <Cartesian
+                            <Polar
+                              axes="xzy"
+                              bend={bend}
+                              scale={[2 * Math.PI, 2 * Math.PI, Math.PI]}
                               range={[
-                                [-1, 1],
-                                [-1, 1],
-                                [-1, 1],
+                                [-Math.PI, Math.PI],
+                                [0, Math.PI],
+                                [-Math.PI, Math.PI],
                               ]}
                             >
                               <Grid
-                                axes="xz"
+                                axes="xy"
                                 width={2}
                                 first={{
-                                  detail: 1,
+                                  detail: 32,
+                                  base: Math.PI,
                                   divide: 10,
                                   zero: false,
                                   end: true,
                                   nice: true,
                                 }}
                                 second={{
-                                  detail: 1,
+                                  detail: 32,
                                   divide: 10,
                                   zero: false,
                                   end: true,
@@ -129,24 +149,29 @@ export function TestApp({ latex, canvas }: TestAppProps): LiveElement {
                                 }}
                                 depth={0.5}
                                 zBias={-1}
+                                origin={[0, 1, 0]}
                               />
                               <Axis
                                 axis="x"
                                 width={4}
                                 depth={0.5}
                                 color={[1, 0.8, 0.8, 1]}
+                                detail={32}
+                                // origin={[0, 1, 0]}
                               />
                               <Axis
                                 axis="y"
                                 width={4}
                                 depth={0.5}
                                 color={[0.8, 1, 0.8, 1]}
+                                detail={32}
                               />
                               <Axis
                                 axis="z"
                                 width={4}
                                 depth={0.5}
                                 color={[0.8, 0.8, 1, 1]}
+                                detail={32}
                               />
 
                               <SampledLambda expr={f} size={[21, 21]}>
@@ -166,18 +191,18 @@ export function TestApp({ latex, canvas }: TestAppProps): LiveElement {
                                   />
                                 </Transpose>
                               </SampledLambda>
-                            </Cartesian>
+                            </Polar>
                           </Plot>
                         </Pass>
                       </OrbitCamera>
                     )}
                   />
-                </Loop>
-              </LinearRGB>
-            </CursorProvider>
-          </DOMEvents>
-        </PickingTarget>
-      </Canvas>
+                </LinearRGB>
+              </CursorProvider>
+            </DOMEvents>
+          </PickingTarget>
+        </Canvas>
+      </Loop>
     </WebGPU>
   );
 }
@@ -194,9 +219,9 @@ const positionSourceShader = wgsl`
   @export fn main(index: u32) -> vec4<f32> {
     let index2d = unpackIndex2(index, sizeToModulus2(size()));
     var pos: vec2<f32> = vec2<f32>(index2d) / vec2<f32>(size() - vec2<u32>(1, 1));
-    pos = pos * (rangeMax().xz - rangeMin().xz) + rangeMin().xz;
-    let y = (f(pos) - rangeMin().y) / (rangeMax().y - rangeMin().y) * 2.0 - 1.0;
-    return vec4(pos.x, y, pos.y, 1);
+    pos = pos * (rangeMax().xy - rangeMin().xy) + rangeMin().xy;
+    let z = (f(pos) - rangeMin().z) / (rangeMax().z - rangeMin().z) * 2.0 - 1.0;
+    return vec4(pos.x, pos.y, z, 1);
   }
 `;
 
@@ -207,6 +232,8 @@ interface SampledLambdaProps {
 }
 
 function SampledLambda({ expr, size, children }: SampledLambdaProps) {
+  const range = useRangeContext();
+
   const { delta, elapsed, timestamp } = useTimeContext();
   useAnimationFrame();
 
@@ -214,8 +241,8 @@ function SampledLambda({ expr, size, children }: SampledLambdaProps) {
     useBoundShader(positionSourceShader, [
       useBoundShader(expr, [elapsed / 1000]),
       size,
-      [-1, -1, -1],
-      [1, 1, 1],
+      range.map((r) => r[0]),
+      range.map((r) => r[1]),
       sizeToModulus2,
       unpackIndex2,
     ]),
@@ -227,4 +254,27 @@ function SampledLambda({ expr, size, children }: SampledLambdaProps) {
       {children}
     </Provide>
   );
+}
+
+function useSpring(target: number, rate = 0.05) {
+  const [value, setValue] = useState(target);
+
+  useResource(
+    (dispose) => {
+      let done = false;
+
+      const fn = () => {
+        if (done) return;
+        requestAnimationFrame(fn);
+
+        setValue((value) => value + (target - value) * rate);
+      };
+
+      dispose(() => (done = true));
+      requestAnimationFrame(fn);
+    },
+    [target, rate]
+  );
+
+  return value;
 }

@@ -2,7 +2,9 @@ import { BoxedExpression } from "@cortex-js/compute-engine";
 
 export function mathToWGSL(
   node: BoxedExpression["json"],
-  symbols: { [name: string]: string } = {}
+  symbols: {
+    [name: string]: string | ((...args: string[]) => string);
+  } = {}
 ): string {
   const symbolToGL = (symbol: string) => {
     switch (symbol) {
@@ -22,7 +24,10 @@ export function mathToWGSL(
         return Math.PI.toPrecision(21);
       default:
         if (symbol in symbols) {
-          return symbols[symbol];
+          const replacement = symbols[symbol];
+          if (typeof replacement === "string") {
+            return replacement;
+          }
         }
         // if (symbol.length === 1) {
         //   return symbol; // Variable (use uniform value)
@@ -158,6 +163,12 @@ export function mathToWGSL(
         return `(${args[0]} / ${args[1] ?? "1.0"})`;
       case "Delimiter":
         return `(${args[0]})`;
+      default: {
+        const replacement = symbols[name];
+        if (typeof replacement === "function") {
+          return replacement(...args);
+        }
+      }
     }
 
     throw new Error(`Unsupported function: ${name}`);

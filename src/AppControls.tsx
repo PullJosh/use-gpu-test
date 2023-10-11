@@ -164,7 +164,9 @@ export const AppControls: LC<AppControlsProps> = (props: AppControlsProps) => {
               <select
                 value={graphType}
                 onChange={(event) => {
-                  setGraphType(event.target.value);
+                  setGraphType(
+                    event.target.value as "cartesian" | "polar" | "spherical"
+                  );
                   if (event.target.value === "polar") {
                     setAxes((axes) => [
                       { variable: "θ", range: [-π, π] },
@@ -209,7 +211,7 @@ export const AppControls: LC<AppControlsProps> = (props: AppControlsProps) => {
                     range: [0, 1],
                     variable: ["x", "y", "z"].find(
                       (v) => !axes.some((a) => a.variable === v)
-                    ),
+                    )!,
                   });
                 }}
               >

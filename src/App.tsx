@@ -343,6 +343,8 @@ export const App: LC = hot(() => {
                                     theta: number,
                                     target: vec3
                                   ) => ( */}
+
+                                {/* @ts-expect-error */}
                                 <GraphWindowControls
                                   range={axes.map((axis) => axis.range)}
                                   setRange={(newRange) => {
@@ -355,7 +357,7 @@ export const App: LC = hot(() => {
                                     setAxes((axes) =>
                                       axes.map((axis, i) => ({
                                         ...axis,
-                                        range: newRange[i],
+                                        range: (newRange as Range)[i],
                                       }))
                                     );
                                   }}

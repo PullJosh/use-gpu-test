@@ -54,7 +54,7 @@ import { ComputeEngine } from "@cortex-js/compute-engine";
 import { mathToWGSL } from "../../../lib/mathToWGSL";
 const ce = new ComputeEngine();
 
-window.ce = ce;
+(window as any).ce = ce;
 
 interface Implicit3DAppProps {
   canvas: HTMLCanvasElement;
